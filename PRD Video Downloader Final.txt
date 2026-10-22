@@ -1,0 +1,66 @@
+====================================================================
+PRODUCT REQUIREMENTS DOCUMENT (PRD)
+====================================================================
+Nama Produk: In-App Browser Video Downloader
+Dokumen    : PRD Final v4
+Sifat Akses: Publik / Gratis (Free to Use)
+====================================================================
+
+1. RINGKASAN PRODUK (OVERVIEW)
+Produk ini adalah platform aplikasi web pengunduh video yang menyediakan "Built-in Browser" melalui teknologi Web Proxy. Pengguna dapat menelusuri situs web apa pun di dalam platform ini. Ketika pengguna memutar sebuah video, sistem secara otomatis mendeteksi (sniffing) jaringan untuk mencari URL media mentah. Sistem menggunakan pemrosesan sisi server (Server-Side) untuk mengunduh, menggabungkan (jika perlu), dan mendistribusikan file menggunakan arsitektur caching database dan cloud storage.
+
+2. TARGET PENGGUNA & MODEL BISNIS
+- Target: Pengguna umum yang membutuhkan cara instan mengunduh video web tanpa perlu berpindah aplikasi atau menyalin link.
+- Model: Sepenuhnya gratis (Bebas pakai) tanpa sistem login berbayar.
+- Filosofi Arsitektur: "Zero-Cost Infrastructure" (Menggunakan kombinasi layanan Cloud Free Tier terbaik untuk menekan biaya server hingga titik nol).
+
+3. ALUR KERJA SISTEM & PENGGUNA (USER FLOW)
+a. Interaksi Pengguna & Sniffing:
+   1. Pengguna membuka situs web aplikasi, memasukkan URL target pada "Address Bar" internal.
+   2. Halaman target dirender menggunakan Web Proxy.
+   3. Pengguna memutar video. Sistem (Sniffer) mencegat request jaringan dan mendeteksi URL media asli.
+
+b. Caching & Pengecekan Database (Turso):
+   4. Sistem mengecek URL media mentah di Database Turso.
+   5. Jika file sudah ada di Storage (Cache Hit): Pengguna langsung diberikan link download.
+   6. Jika file belum ada (Cache Miss): Lanjut ke tahap antrean.
+
+c. Proses Antrean & Download (Server-Side):
+   7. Pengguna melihat layar "Sedang diproses...". Permintaan masuk ke sistem antrean (Queue).
+   8. Server Node.js mengunduh media. Jika format terpisah (audio/video atau m3u8), server menggabungkannya menjadi .mp4 menggunakan FFmpeg.
+
+d. Penyimpanan (Cloudflare R2) & Distribusi:
+   9. Server mengunggah file .mp4 yang sudah jadi ke Cloudflare R2 Bucket.
+   10. Server mencatat metadata (URL Sumber, R2 File Key, Timestamp) ke Database Turso.
+   11. Pengguna menerima URL unduhan publik dari Cloudflare R2 (Bebas biaya bandwidth/egress).
+
+4. FITUR UTAMA (CORE FEATURES)
+a. Web Proxy Browser
+   - Menghindari pemblokiran CORS saat merender situs eksternal.
+   - Address bar internal dengan kontrol navigasi dasar.
+
+b. Network Sniffer
+   - Mendeteksi .mp4, .webm, audio terpisah, dan stream .m3u8 di latar belakang jaringan.
+
+c. Antrean Server (Task Queue)
+   - Membatasi proses unduhan bersamaan (concurrency limit) agar server tidak kelebihan beban (crash).
+
+d. Caching & Auto-Cleanup (Manajemen Penyimpanan)
+   - Skrip terjadwal (Cron job) yang berjalan setiap 24/48 jam.
+   - Menghapus file video lama dari Cloudflare R2 dan menghapus baris catatannya dari Turso untuk memastikan penyimpanan tetap di bawah batas kuota gratis.
+
+5. KEBUTUHAN TEKNOLOGI & SKILL (TECH STACK)
+- Frontend: React.js / Next.js
+- Backend Utama & Proxy: Node.js (Express/Fastify)
+- Database (Cache & Queue Log): Turso (SQLite on the Edge)
+- Object Storage (Media Files): Cloudflare R2
+- Video Processing: FFmpeg (terinstal di backend server)
+- Referensi Skill / Teknologi Eksternal: 
+  * https://github.com/Leonxlnx/taste-skill.git
+
+6. BATASAN & MITIGASI (LIMITATIONS)
+- Kuota Penyimpanan: Gratis maksimal 5GB (Turso) dan 10GB (Cloudflare R2). Mitigasi: Eksekusi fitur Auto-Cleanup secara ketat.
+- DRM (Digital Rights Management): Platform streaming dengan enkripsi (Netflix, Disney+) tetap tidak dapat diunduh.
+- Spesifikasi Backend: Karena menggunakan Server-Side Processing (FFmpeg), backend memerlukan RAM dan CPU yang memadai. Sebaiknya menggunakan VPS murah atau layanan PaaS gratis yang mengizinkan binary FFmpeg.
+
+====================================================================
